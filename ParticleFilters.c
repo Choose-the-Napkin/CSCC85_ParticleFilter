@@ -397,7 +397,7 @@ void ParticleFilterLoop(void)
   if (first_frame)
   {
    fprintf(stderr,"All set! press enter to start\n");
-   gets(&line[0]);
+   fgets(line, 1024, stdin);
    first_frame=0;
   }
 }
