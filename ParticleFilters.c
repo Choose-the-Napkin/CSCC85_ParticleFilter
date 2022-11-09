@@ -159,7 +159,7 @@ void initParticles(void)
  ***************************************************************/
 
   for (int i = 0; i < n_particles; i++){ // Add n bots to the head
-    particle *new_bot = initRobot();
+    particle *new_bot = initRobot(map, sx, sy);
     new_bot->next = list;
     list = new_bot;
   }
@@ -212,13 +212,13 @@ void computeLikelihood(struct particle *p, struct particle *rob, double noise_si
  //        likelihood given the robot's measurements
  ****************************************************************/
   //sonar_measurement(rob, map, sx, sy);
-  ground_truth(p, map, sx, sy)
+  ground_truth(p, map, sx, sy);
   double totalError = 0;
   for (int i = 0; i < 16; i++){
-    totalError += abs(p->measureD[i] - rob->measureD[i]);
+    totalError += pow(p->measureD[i] - rob->measureD[i], 2);
   }
 
-  p->prob = totalError;
+  p->prob = pow(totalError, 0.5);
 }
 
 void ParticleFilterLoop(void)
@@ -251,12 +251,22 @@ void ParticleFilterLoop(void)
    //
    //          Don't forget to move the robot the same distance!
 
+  double loop_dist = 0.35;
   particle *tmp_particle = list;
   while (tmp_particle != NULL){
-    move(tmp_particle, 1);
+    move(tmp_particle, loop_dist);
+    if (hit(tmp_particle, map, sx, sy)){
+      tmp_particle -> theta = fmod((tmp_particle -> theta + 180), 360.0); 
+      move(tmp_particle, loop_dist); // Adds randomness and puts it back on track
+    }
     tmp_particle = tmp_particle->next;
   }
-  move(robot, 1);
+  
+  move(robot, loop_dist);
+  if (hit(robot, map, sx, sy)){
+    robot -> theta = fmod((robot -> theta + 180), 360.0); 
+    move(robot, loop_dist); // Automatically adds randomness
+  }
 
    /******************************************************************
    // TO DO: Complete Step 1 and test it
@@ -272,6 +282,20 @@ void ParticleFilterLoop(void)
    //          each particle. Once you have a likelihood for every
    //          particle, turn it into a probability by ensuring that
    //          the sum of the likelihoods for all particles is 1.
+
+  tmp_particle = list;
+  double largestError = 0;
+  while (tmp_particle != NULL){
+    computeLikelihood(tmp_particle, robot, 0);
+    if (tmp_particle->prob > largestError) largestError = tmp_particle->prob;
+    tmp_particle = tmp_particle->next;
+  }
+
+  tmp_particle = list;
+  while (tmp_particle != NULL){
+    tmp_particle->prob = (largestError - tmp_particle->prob) / largestError;
+    tmp_particle = tmp_particle->next;
+  }
 
    /*******************************************************************
    // TO DO: Complete Step 3 and test it
