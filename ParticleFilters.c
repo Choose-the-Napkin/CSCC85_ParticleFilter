@@ -158,6 +158,11 @@ void initParticles(void)
  //        list of particles.
  ***************************************************************/
 
+  for (int i = 0; i < n_particles; i++){ // Add n bots to the head
+    particle *new_bot = initRobot();
+    new_bot->next = list;
+    list = new_bot;
+  }
 }
 
 void computeLikelihood(struct particle *p, struct particle *rob, double noise_sigma)
@@ -206,7 +211,14 @@ void computeLikelihood(struct particle *p, struct particle *rob, double noise_si
  // TO DO: Complete this function to calculate the particle's
  //        likelihood given the robot's measurements
  ****************************************************************/
+  //sonar_measurement(rob, map, sx, sy);
+  ground_truth(p, map, sx, sy)
+  double totalError = 0;
+  for (int i = 0; i < 16; i++){
+    totalError += abs(p->measureD[i] - rob->measureD[i]);
+  }
 
+  p->prob = totalError;
 }
 
 void ParticleFilterLoop(void)
@@ -238,6 +250,13 @@ void ParticleFilterLoop(void)
    //          location.
    //
    //          Don't forget to move the robot the same distance!
+
+  particle *tmp_particle = list;
+  while (tmp_particle != NULL){
+    move(tmp_particle, 1);
+    tmp_particle = tmp_particle->next;
+  }
+  move(robot, 1);
 
    /******************************************************************
    // TO DO: Complete Step 1 and test it
