@@ -213,12 +213,12 @@ void computeLikelihood(struct particle *p, struct particle *rob, double noise_si
  ****************************************************************/
   //sonar_measurement(rob, map, sx, sy);
   ground_truth(p, map, sx, sy);
-  double totalError = 0;
+  double propJustError = 1;
   for (int i = 0; i < 16; i++){
-    totalError += pow(p->measureD[i] - rob->measureD[i], 2);
+    propJustError *= GaussEval(p->measureD[i] - rob->measureD[i], noise_sigma);
   }
 
-  p->prob = pow(totalError, 0.5);
+  p->prob = propJustError;
 }
 
 void ParticleFilterLoop(void)
@@ -236,6 +236,8 @@ void ParticleFilterLoop(void)
   char line[1024];
   // Add any local variables you need right below.
 
+  time_t t;
+  srand((unsigned) time(&t));
   if (!first_frame)
   {
    // Step 1 - Move all particles a given distance forward (this will be in
@@ -284,16 +286,16 @@ void ParticleFilterLoop(void)
    //          the sum of the likelihoods for all particles is 1.
 
   tmp_particle = list;
-  double largestError = 0;
+  double totalPropability = 0;
   while (tmp_particle != NULL){
-    computeLikelihood(tmp_particle, robot, 0);
-    if (tmp_particle->prob > largestError) largestError = tmp_particle->prob;
+    computeLikelihood(tmp_particle, robot, 20);
+    totalPropability += tmp_particle->prob;
     tmp_particle = tmp_particle->next;
   }
 
   tmp_particle = list;
   while (tmp_particle != NULL){
-    tmp_particle->prob = (largestError - tmp_particle->prob) / largestError;
+    tmp_particle->prob = tmp_particle->prob / totalPropability;
     tmp_particle = tmp_particle->next;
   }
 
@@ -336,8 +338,55 @@ void ParticleFilterLoop(void)
    //        Hopefully the largest cluster will be on and around
    //        the robot's actual location/direction.
    *******************************************************************/
+    particle *pointers_database[n_particles * 2];
+    int latest = 0;
+    // populate database based on particles 
+    tmp_particle = list;
+    while (tmp_particle != NULL){
+      int num_dupes = (int)(2 * n_particles * tmp_particle->prob);
+      for (int i = 0; i < num_dupes; i++){
+        pointers_database[latest] = tmp_particle;
+        latest++;
+      }
+      tmp_particle = tmp_particle->next;
+    }
 
+    // Now pick n_particle new particles from the weighted array
+    particle *newHead = NULL;
+    int num_dupes_made = (int)(n_particles * 0.975);
+    double newListTotal = 0;
+    for (int i = 0; i < num_dupes_made; i++){
+      int new_ind = rand() % latest;
+      particle *chosen_particle = pointers_database[new_ind];
+      particle *new_bot = (particle *)malloc(sizeof(particle));
+        new_bot-> x = chosen_particle->x;
+        new_bot-> y = chosen_particle->y;
+        new_bot-> theta = chosen_particle->theta;
+        new_bot-> prob = chosen_particle->prob;
+        newListTotal += new_bot-> prob;
+        new_bot->next = newHead;
+        newHead = new_bot;
+    }
+
+    for (int i = 0; i < n_particles - num_dupes_made; i++){
+      // randomly populate in case we're off
+      particle *new_bot = initRobot(map, sx, sy);
+      new_bot->next = newHead;
+      new_bot->prob = 0;
+      newHead = new_bot;
+    }
+
+    // renormalize
+    tmp_particle = list;
+    while (tmp_particle != NULL){
+      tmp_particle->prob = tmp_particle->prob / newListTotal;
+      tmp_particle = tmp_particle->next;
+    }
+
+    deleteList(list);
+    list = newHead;
   }  // End if (!first_frame)
+
 
   /***************************************************
    OpenGL stuff
